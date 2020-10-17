@@ -1,85 +1,111 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Threading;
 using Microsoft.SPOT;
 using Microsoft.SPOT.Hardware;
 using CTRE.Phoenix.Controller;
 using CTRE.Phoenix.MotorControl;
 using CTRE.Phoenix.MotorControl.CAN;
+using CTRE.Phoenix;
 
 namespace THE_KINGS_MENTAL_BREAKDOWN
 {
-
+    public enum FlagState
+    {
+        TURNING,
+        IDLE
+    }
+    public enum DriveState
+    {
+        PRECISE, //slower, lower gain
+        STRONGER //faster, higher gain 
+    }
     public enum ElevatorState
     {
-        NOTHING,
+        IDLE,
         RISE,
         LOWER,
-        FUCK
+        ERROR
     }
 
     public class Program
     {
-   
-        private static bool autonActive;
-        private static ElevatorState elevatorState = ElevatorState.FUCK;
+        static readonly Stopwatch stopwatch = new Stopwatch();
 
-        private static float forwardAxis;
-        private static float turnAxis;
-        private static float finalLeftTalonValue;
-        private static float finalRightTalonValue;
+        private static ElevatorState elevatorState = ElevatorState.ERROR;
+        private static DriveState driveState = DriveState.PRECISE;  //creates a variable with a Drivestate type, makes the starting value PRECISE
+        private static FlagState flagState = FlagState.IDLE; //creates a variable with a FlagState type, makes the starting value IDLE
 
-        //these two multiplier decide the stronkgth of turning and forward drive.
-        private const float forwardGain = 0.5f;
-        private const float turnGain = 0.25f;
+        private static float turnAxis; //x-axis of stick 
+        private static float forwardAxis; // y-axis of stick 
+        private static float finalLeftTalonValue; //final motor value of left drive talon after conidering gain, turn, and forward  
+        private static float finalRightTalonValue; //final motor value of right drive talon after conidering gain, turn, and forward 
+
+        private static float forwardGain; // strength of forward
+        private static float turnGain; //strength of turn
 
         public static void Main()
         {
-            /* Do auton????? Maybe????? EE????? */
-            autonActive = true;
+            stopwatch.Start();
+            var t1 = new Thread(Everything);
+            t1.Start();
+            var t2 = new Thread(PrintTime);
+            t2.Start();
+        }
+
+        static void Everything()
+        {
+            TimeSpan time = time.Elapsed;
 
             /* Creating our gamepad */
-            GameController veryBadController = new GameController(new CTRE.Phoenix.UsbHostDevice(0));
+            GameController gamepad1 = new GameController(new CTRE.Phoenix.UsbHostDevice(0));
 
-            /* Talon defining. */
+            //creating TalonSRX objects(dirvetrain, climber or elevator, and flag raise)
             TalonSRX leftDriveTalon = new TalonSRX(0);
             TalonSRX rightDriveTalon = new TalonSRX(1);
-            TalonSRX climbyTalon = new TalonSRX(2);
+            TalonSRX climbTalon = new TalonSRX(2);
+            TalonSRX flagTalon = new TalonSRX(3);
 
-            /* simple counter to print and watch using the debugger */
-            int counter = 0;
-
-            /* This loops everything inside forever. So, everything in the loop just... keeps going... assuming it works */
+            //loops forever 
             while (true)
             {
+                rightDriveTalon.ConfigFactoryDefault();
+                leftDriveTalon.ConfigFactoryDefault();
+                climbTalon.ConfigFactoryDefault();
+                flagTalon.ConfigFactoryDefault();
+
                 /* this is checked periodically. Recommend every 20ms or faster */
-                if (veryBadController.GetConnectionStatus() == CTRE.Phoenix.UsbDeviceConnection.Connected)
+                if (gamepad1.GetConnectionStatus() == CTRE.Phoenix.UsbDeviceConnection.Connected)
                 {
                     /* print axis value */
-                    Debug.Print("axis:" + veryBadController.GetAxis(1));
+                    Debug.Print("axis:" + gamepad1.GetAxis(1));
 
                     /* allow motor control */
                     CTRE.Phoenix.Watchdog.Feed();
 
                 }
 
-                // Awfully amazing Auton
-                if (autonActive == true)
+                //autonomous period 
+                if (time.Seconds < 30)//time < 30
                 {
                     Debug.Print("Auton is attempting to E");
-
-                    leftDriveTalon.Set(ControlMode.PercentOutput, 0.5); //sets left drive talon to 50%
-                    rightDriveTalon.Set(ControlMode.PercentOutput, 0.5); //sets right drive talon to 50%
-
-
-                    if (counter >= 600)
+                    for (int autonCounter = 0; autonCounter < 3000; autonCounter++)
                     {
-                        Debug.Print("Auton ending, E complete.");
-                        leftDriveTalon.Set(ControlMode.PercentOutput, 0.0); //sets left drive talon to 0%
-                        rightDriveTalon.Set(ControlMode.PercentOutput, 0.0); //sets right drive talon to 0%
-                        autonActive = false;
-                    };
+                        leftDriveTalon.Set(ControlMode.PercentOutput, 0.5); //sets left drive talon to 50%
+                        rightDriveTalon.Set(ControlMode.PercentOutput, 0.5); //sets right drive talon to 50%
+
+                        Debug.Print("autonCounter Value: " + autonCounter);
+
+                        /* Amount of time to wait before repeating the loop */
+                        Thread.Sleep(10);
+                    }
+
+                    Debug.Print("Auton ending, E complete.");
+                    leftDriveTalon.Set(ControlMode.PercentOutput, 0.0); //sets left drive talon to 0%
+                    rightDriveTalon.Set(ControlMode.PercentOutput, 0.0); //sets right drive talon to 0%
+
                 }
-                else // Less awfully amazing teleop
+                else // teleop
                 {
                     /* NOTE TO HAYDON: ADD THE ACTUAL CONTROLLER AXISES IDS
                     stick 1 x axis: id 2?
@@ -90,8 +116,8 @@ namespace THE_KINGS_MENTAL_BREAKDOWN
 
 
                     //determine inputs
-                    forwardAxis = veryBadController.GetAxis(1);
-                    turnAxis = veryBadController.GetAxis(2);
+                    forwardAxis = gamepad1.GetAxis(1);
+                    turnAxis = gamepad1.GetAxis(2);
 
                     //accounting for forward and turn b4 Eing into the talons
                     finalLeftTalonValue = (forwardAxis * forwardGain) + (turnAxis * turnGain);
@@ -102,15 +128,37 @@ namespace THE_KINGS_MENTAL_BREAKDOWN
                     rightDriveTalon.Set(ControlMode.PercentOutput, finalRightTalonValue);
 
                     /* the climby controls NOTE TO HAYDON: ADD THE ACTUAL CONTROLLER BUTTON IDS*/
-                    if (veryBadController.GetButton(6808099))
+                    if (gamepad1.GetButton(6808099))
                     {
                         elevatorState = ElevatorState.RISE;
-                    } else if (veryBadController.GetButton(9897))
+                    }
+                    else if (gamepad1.GetButton(9897))
                     {
                         elevatorState = ElevatorState.LOWER;
-                    } else
+                    }
+                    else
                     {
-                        elevatorState = ElevatorState.NOTHING;
+                        elevatorState = ElevatorState.IDLE;
+                    }
+
+                    //if the button is pressed the drivestate will switch 
+                    if (gamepad1.GetButton(1423) && driveState == DriveState.PRECISE)//stick button
+                    {
+                        driveState = DriveState.STRONGER;
+                    }
+                    else if (gamepad1.GetButton(1423) && driveState == DriveState.STRONGER)
+                    {
+                        driveState = DriveState.PRECISE;
+                    }
+
+
+                    if (gamepad1.GetButton(1232) && flagState == FlagState.IDLE)
+                    {
+                        flagState = FlagState.TURNING;
+                    }
+                    else if (gamepad1.GetButton(1232) && flagState == FlagState.TURNING)
+                    {
+                        flagState = FlagState.IDLE;
                     }
 
                 }
@@ -118,36 +166,77 @@ namespace THE_KINGS_MENTAL_BREAKDOWN
                 /* elevator state machine garbo */
                 switch (elevatorState)
                 {
-                    case ElevatorState.NOTHING:
-                        Debug.Print("the elevator aint doin shit");
-                        climbyTalon.Set(ControlMode.PercentOutput, 0.0); //sets the climber talon to 0%
+                    case ElevatorState.IDLE:
+                        Debug.Print("nothing");
+                        climbTalon.Set(ControlMode.PercentOutput, 0.0); //sets the climber talon to 0%
                         break;
                     case ElevatorState.RISE:
-                        Debug.Print("OH LOARD HE RISEN");
-                        climbyTalon.Set(ControlMode.PercentOutput, 0.5); //sets the climber talon to 50%
+                        Debug.Print("rising");
+                        climbTalon.Set(ControlMode.PercentOutput, 0.5); //sets the climber talon to 50%
                         break;
                     case ElevatorState.LOWER:
-                        Debug.Print("OH LOARD HE FALLEN");
-                        climbyTalon.Set(ControlMode.PercentOutput, -0.5); //sets the climber talon to -50%
+                        Debug.Print("lowering");
+                        climbTalon.Set(ControlMode.PercentOutput, -0.5); //sets the climber talon to -50%
                         break;
-                    case ElevatorState.FUCK:
-                        Debug.Print("what fuck");
+                    case ElevatorState.ERROR:
+                        Debug.Print("ElevatorState error");
                         break;
                     default:
-                        Debug.Print("WHAT FUCK??????///??");
+                        Debug.Print("very bad error");
                         break;
                 }
 
-                
-                
-                /* print the three analog inputs as three columns */
-                Debug.Print("Counter Value: " + counter);
+                //drive gain state machine 
+                switch (driveState)
+                {
+                    case DriveState.PRECISE:
+                        forwardGain = 0.3f;
+                        turnGain = 0.1f;
+                        Debug.Print("precise");
+                        break;
+                    case DriveState.STRONGER:
+                        forwardGain = 0.5f;
+                        turnGain = 0.25f;
+                        Debug.Print("stronger");
+                        break;
+                    default:
+                        Debug.Print("DriveState error");
+                        break;
+                }
 
-                /* increment counter */
-                ++counter; /* try to land a breakpoint here and hover over 'counter' to see it's current value.  Or add it to the Watch Tab */
+                //flag state machine 
+                switch (flagState)
+                {
+                    case FlagState.TURNING:
+                        flagTalon.Set(ControlMode.PercentOutput, 0.5);
+                        Debug.Print("turning");
+                        break;
+                    case FlagState.IDLE:
+                        flagTalon.Set(ControlMode.PercentOutput, 0.0);
+                        Debug.Print("idle");
+                        break;
+                    default:
+                        Debug.Print("FlagState error");
+                        break;
+                }
 
-                /* Amount of time to wait before repeating the loop */
-                System.Threading.Thread.Sleep(10);
+
+            }
+        }
+
+        static void PrintTime()
+        {
+            bool timer = true;
+            while (timer)
+            {
+                Thread.Sleep(1000);
+                TimeSpan time = stopwatch.Elapsed;
+                Debug.Print("time: " + time.Seconds);
+                if (time.Seconds == 10)
+                {
+                    timer = false;
+                    stopwatch.Stop();
+                }
             }
         }
     }
