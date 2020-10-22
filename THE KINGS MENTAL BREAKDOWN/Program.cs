@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Diagnostics;
 using System.Threading;
 using Microsoft.SPOT;
 using Microsoft.SPOT.Hardware;
@@ -30,7 +29,7 @@ namespace THE_KINGS_MENTAL_BREAKDOWN
 
     public class Program
     {
-        static readonly Stopwatch stopwatch = new Stopwatch();
+        static Stopwatch stopwatch = new Stopwatch();
 
         private static ElevatorState elevatorState = ElevatorState.ERROR;
         private static DriveState driveState = DriveState.PRECISE;  //creates a variable with a Drivestate type, makes the starting value PRECISE
@@ -55,7 +54,7 @@ namespace THE_KINGS_MENTAL_BREAKDOWN
 
         static void Everything()
         {
-            TimeSpan time = time.Elapsed;
+            float time = stopwatch.Duration; 
 
             /* Creating our gamepad */
             GameController gamepad1 = new GameController(new CTRE.Phoenix.UsbHostDevice(0));
@@ -85,26 +84,24 @@ namespace THE_KINGS_MENTAL_BREAKDOWN
 
                 }
 
-                //autonomous period 
-                if (time.Seconds < 30)//time < 30
+                // not finished autonomous period 
+                if (time < 30)//time < 30
                 {
                     Debug.Print("Auton is attempting to E");
-                    for (int autonCounter = 0; autonCounter < 3000; autonCounter++)
-                    {
-                        leftDriveTalon.Set(ControlMode.PercentOutput, 0.5); //sets left drive talon to 50%
-                        rightDriveTalon.Set(ControlMode.PercentOutput, 0.5); //sets right drive talon to 50%
 
-                        Debug.Print("autonCounter Value: " + autonCounter);
+                     leftDriveTalon.Set(ControlMode.PercentOutput, 0.5); //sets left drive talon to 50%
+                     rightDriveTalon.Set(ControlMode.PercentOutput, 0.5); //sets right drive talon to 50%
 
-                        /* Amount of time to wait before repeating the loop */
-                        Thread.Sleep(10);
-                    }
+
+                     /*  Amount of time to wait before repeating the loop */
+                     Thread.Sleep(10);
 
                     Debug.Print("Auton ending, E complete.");
                     leftDriveTalon.Set(ControlMode.PercentOutput, 0.0); //sets left drive talon to 0%
                     rightDriveTalon.Set(ControlMode.PercentOutput, 0.0); //sets right drive talon to 0%
-
                 }
+
+
                 else // teleop
                 {
                     /* NOTE TO HAYDON: ADD THE ACTUAL CONTROLLER AXISES IDS
@@ -230,12 +227,11 @@ namespace THE_KINGS_MENTAL_BREAKDOWN
             while (timer)
             {
                 Thread.Sleep(1000);
-                TimeSpan time = stopwatch.Elapsed;
-                Debug.Print("time: " + time.Seconds);
-                if (time.Seconds == 10)
+                float time = stopwatch.Duration;
+                Debug.Print("time: " + time );
+                if (time >= 10)
                 {
                     timer = false;
-                    stopwatch.Stop();
                 }
             }
         }
