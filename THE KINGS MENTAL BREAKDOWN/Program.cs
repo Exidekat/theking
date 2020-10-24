@@ -73,7 +73,7 @@ namespace THE_KINGS_MENTAL_BREAKDOWN
                 climbTalon.ConfigFactoryDefault();
                 flagTalon.ConfigFactoryDefault();
 
-                /* this is checked periodically. Recommend every 20ms or faster */
+                /* this is checked periodically*/
                 if (gamepad1.GetConnectionStatus() == CTRE.Phoenix.UsbDeviceConnection.Connected)
                 {
                     /* print axis value */
@@ -217,7 +217,6 @@ namespace THE_KINGS_MENTAL_BREAKDOWN
                         break;
                 }
 
-
             }
         }
 
@@ -229,7 +228,7 @@ namespace THE_KINGS_MENTAL_BREAKDOWN
                 Thread.Sleep(1000);
                 float time = stopwatch.Duration;
                 Debug.Print("time: " + time );
-                if (time >= 10)
+                if (time >= 200)
                 {
                     timer = false;
                 }
