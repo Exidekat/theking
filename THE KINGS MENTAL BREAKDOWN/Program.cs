@@ -28,7 +28,6 @@ namespace THE_KINGS_MENTAL_BREAKDOWN
 
         private static ElevatorState elevatorState = ElevatorState.ERROR; //creates a variable with a ElevatorState type, makes the starting value ERROR 
         private static DriveState driveState = DriveState.PRECISE;  //creates a variable with a DriveState type, makes the starting value PRECISE
-        private static FlagState flagState = FlagState.IDLE; //creates a variable with a FlagState type, makes the starting value IDLE
 
         //creating a GameController object
         private static GameController gamepad1 = new GameController(new CTRE.Phoenix.UsbHostDevice(0));
@@ -37,7 +36,6 @@ namespace THE_KINGS_MENTAL_BREAKDOWN
         private static TalonSRX leftDriveTalon = new TalonSRX(0);
         private static TalonSRX rightDriveTalon = new TalonSRX(1);
         private static TalonSRX climbTalon = new TalonSRX(2);
-        private static TalonSRX flagTalon = new TalonSRX(3);
 
         private static float turnAxis; //x-axis of stick 
         private static float forwardAxis; // y-axis of stick 
@@ -66,7 +64,6 @@ namespace THE_KINGS_MENTAL_BREAKDOWN
             rightDriveTalon.ConfigFactoryDefault();
             leftDriveTalon.ConfigFactoryDefault();
             climbTalon.ConfigFactoryDefault();
-            flagTalon.ConfigFactoryDefault();
 
             // not finished autonomous period 
             if (time < 30)
@@ -83,7 +80,7 @@ namespace THE_KINGS_MENTAL_BREAKDOWN
                 rightDriveTalon.Set(ControlMode.PercentOutput, 0.0); //sets right drive talon to 0%
             }
 
-            if (gamepad1.GetConnectionStatus() == CTRE.Phoenix.UsbDeviceConnection.)
+            if (gamepad1.GetConnectionStatus() == CTRE.Phoenix.UsbDeviceConnection.Connected)
             { 
                 // print axis value ???
                 Debug.Print("axis:" + gamepad1.GetAxis(1));
@@ -128,16 +125,6 @@ namespace THE_KINGS_MENTAL_BREAKDOWN
                     driveState = DriveState.PRECISE;
                 }
 
-                // If the button is pressed then the flagState with switch 
-                if (gamepad1.GetButton(1232) && flagState == FlagState.IDLE)
-                {
-                    flagState = FlagState.TURNING;
-                }
-                else if (gamepad1.GetButton(1232) && flagState == FlagState.TURNING)
-                {
-                    flagState = FlagState.IDLE;
-                }
-
                 // elevator state machine
                 switch (elevatorState)
                 {
@@ -178,23 +165,6 @@ namespace THE_KINGS_MENTAL_BREAKDOWN
                         Debug.Print("DriveState error");
                         break;
                 }
-
-                // flag state machine 
-                switch (flagState)
-                {
-                    case FlagState.TURNING:
-                        flagTalon.Set(ControlMode.PercentOutput, 0.5);
-                        Debug.Print("turning");
-                        break;
-                    case FlagState.IDLE:
-                        flagTalon.Set(ControlMode.PercentOutput, 0.0);
-                        Debug.Print("idle");
-                        break;
-                    default:
-                        Debug.Print("FlagState error");
-                        break;
-                }
-
             }
         }
 
