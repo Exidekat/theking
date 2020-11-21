@@ -5,149 +5,182 @@ using Microsoft.SPOT.Hardware;
 using CTRE.Phoenix.Controller;
 using CTRE.Phoenix.MotorControl;
 using CTRE.Phoenix.MotorControl.CAN;
+using CTRE.Phoenix;
 
 namespace THE_KINGS_MENTAL_BREAKDOWN
 {
-
+    public enum DriveState
+    {
+        PRECISE, //slower, lower gain
+        STRONGER //faster, higher gain 
+    }
     public enum ElevatorState
     {
-        NOTHING,
+        IDLE,
         RISE,
         LOWER,
-        FUCK
+        ERROR
     }
 
     public class Program
     {
-   
-        private static bool autonActive;
-        private static ElevatorState elevatorState = ElevatorState.FUCK;
+        private static Stopwatch stopwatch = new Stopwatch();
 
-        private static float forwardAxis;
-        private static float turnAxis;
-        private static float finalLeftTalonValue;
-        private static float finalRightTalonValue;
+        private static ElevatorState elevatorState = ElevatorState.ERROR; //creates a variable with a ElevatorState type, makes the starting value ERROR 
+        private static DriveState driveState = DriveState.PRECISE;  //creates a variable with a DriveState type, makes the starting value PRECISE
 
-        //these two multiplier decide the stronkgth of turning and forward drive.
-        private const float forwardGain = 0.5f;
-        private const float turnGain = 0.25f;
+        //creating a GameController object
+        private static GameController gamepad1 = new GameController(new CTRE.Phoenix.UsbHostDevice(0));
+
+        //creating TalonSRX objects(drivetrain(right and left), climber or elevator, and flag raise)
+        private static TalonSRX leftDriveTalon = new TalonSRX(0);
+        private static TalonSRX rightDriveTalon = new TalonSRX(1);
+        private static TalonSRX climbTalon = new TalonSRX(2);
+
+        private static float turnAxis; //x-axis of stick 
+        private static float forwardAxis; // y-axis of stick 
+        private static float finalLeftTalonValue; //final motor value of left drive talon after conidering gain, turn, and forward  
+        private static float finalRightTalonValue; //final motor value of right drive talon after conidering gain, turn, and forward 
+
+        private static float forwardGain; // strength of forward
+        private static float turnGain; //strength of turn
 
         public static void Main()
         {
-            /* Do auton????? Maybe????? EE????? */
-            autonActive = true;
+            //runs both PrintTime and Everything
+            stopwatch.Start();
+            var t1 = new Thread(Everything);
+            t1.Start();
+            var t2 = new Thread(PrintTime);
+            t2.Start();
+        }
 
-            /* Creating our gamepad */
-            GameController veryBadController = new GameController(new CTRE.Phoenix.UsbHostDevice(0));
+        static void Everything()
+        {
+            // creates a variable for the time(seconds)
+            float time = stopwatch.Duration; 
 
-            /* Talon defining. */
-            TalonSRX leftDriveTalon = new TalonSRX(0);
-            TalonSRX rightDriveTalon = new TalonSRX(1);
-            TalonSRX climbyTalon = new TalonSRX(2);
+            // prevents unexpected behavior 
+            rightDriveTalon.ConfigFactoryDefault();
+            leftDriveTalon.ConfigFactoryDefault();
+            climbTalon.ConfigFactoryDefault();
 
-            /* simple counter to print and watch using the debugger */
-            int counter = 0;
-
-            /* This loops everything inside forever. So, everything in the loop just... keeps going... assuming it works */
-            while (true)
+            // not finished autonomous period 
+            if (time < 30)
             {
-                /* this is checked periodically. Recommend every 20ms or faster */
-                if (veryBadController.GetConnectionStatus() == CTRE.Phoenix.UsbDeviceConnection.Connected)
+                Debug.Print("Auton is attempting to E");
+
+                leftDriveTalon.Set(ControlMode.PercentOutput, 0.5); //sets left drive talon to 50%
+                rightDriveTalon.Set(ControlMode.PercentOutput, 0.5); //sets right drive talon to 50%
+
+                Thread.Sleep(10);
+
+                Debug.Print("Auton ending, E complete.");
+                leftDriveTalon.Set(ControlMode.PercentOutput, 0.0); //sets left drive talon to 0%
+                rightDriveTalon.Set(ControlMode.PercentOutput, 0.0); //sets right drive talon to 0%
+            }
+
+            if (gamepad1.GetConnectionStatus() == CTRE.Phoenix.UsbDeviceConnection.Connected)
+            { 
+                // print axis value ???
+                Debug.Print("axis:" + gamepad1.GetAxis(1));
+
+                // allows motor control 
+                CTRE.Phoenix.Watchdog.Feed();
+
+                // Teleoperated 
+                // determine inputs
+                forwardAxis = gamepad1.GetAxis(1);
+                turnAxis = gamepad1.GetAxis(2);
+
+                // accounting for forward and turn b4 Eing into the talons
+                finalLeftTalonValue = (forwardAxis * forwardGain) + (turnAxis * turnGain);
+                finalRightTalonValue = (forwardAxis * forwardGain) - (turnAxis * turnGain);
+
+                // pass motor value to Talons 
+                leftDriveTalon.Set(ControlMode.PercentOutput, finalLeftTalonValue);
+                rightDriveTalon.Set(ControlMode.PercentOutput, finalRightTalonValue);
+
+                 // Elevator controls 
+                if (gamepad1.GetButton(6808099))
                 {
-                    /* print axis value */
-                    Debug.Print("axis:" + veryBadController.GetAxis(1));
-
-                    /* allow motor control */
-                    CTRE.Phoenix.Watchdog.Feed();
-
+                    elevatorState = ElevatorState.RISE;
+                }
+                else if (gamepad1.GetButton(9897))
+                {
+                    elevatorState = ElevatorState.LOWER;
+                }
+                else
+                {
+                    elevatorState = ElevatorState.IDLE;
                 }
 
-                // Awfully amazing Auton
-                if (autonActive == true)
+                // if the button is pressed the drivestate will switch 
+                if (gamepad1.GetButton(1423) && driveState == DriveState.PRECISE)// stick button
                 {
-                    Debug.Print("Auton is attempting to E");
-
-                    leftDriveTalon.Set(ControlMode.PercentOutput, 0.5); //sets left drive talon to 50%
-                    rightDriveTalon.Set(ControlMode.PercentOutput, 0.5); //sets right drive talon to 50%
-
-
-                    if (counter >= 600)
-                    {
-                        Debug.Print("Auton ending, E complete.");
-                        leftDriveTalon.Set(ControlMode.PercentOutput, 0.0); //sets left drive talon to 0%
-                        rightDriveTalon.Set(ControlMode.PercentOutput, 0.0); //sets right drive talon to 0%
-                        autonActive = false;
-                    };
+                    driveState = DriveState.STRONGER;
                 }
-                else // Less awfully amazing teleop
+                else if (gamepad1.GetButton(1423) && driveState == DriveState.STRONGER)
                 {
-                    /* NOTE TO HAYDON: ADD THE ACTUAL CONTROLLER AXISES IDS
-                    stick 1 x axis: id 2?
-                    stick 1 y axis: id 1?
-                    stick 2 x axis: id
-                    stick 2 y axis: id
-                    */
-
-
-                    //determine inputs
-                    forwardAxis = veryBadController.GetAxis(1);
-                    turnAxis = veryBadController.GetAxis(2);
-
-                    //accounting for forward and turn b4 Eing into the talons
-                    finalLeftTalonValue = (forwardAxis * forwardGain) + (turnAxis * turnGain);
-                    finalRightTalonValue = (forwardAxis * forwardGain) - (turnAxis * turnGain);
-
-                    /* pass motor value to talons */
-                    leftDriveTalon.Set(ControlMode.PercentOutput, finalLeftTalonValue);
-                    rightDriveTalon.Set(ControlMode.PercentOutput, finalRightTalonValue);
-
-                    /* the climby controls NOTE TO HAYDON: ADD THE ACTUAL CONTROLLER BUTTON IDS*/
-                    if (veryBadController.GetButton(6808099))
-                    {
-                        elevatorState = ElevatorState.RISE;
-                    } else if (veryBadController.GetButton(9897))
-                    {
-                        elevatorState = ElevatorState.LOWER;
-                    } else
-                    {
-                        elevatorState = ElevatorState.NOTHING;
-                    }
-
+                    driveState = DriveState.PRECISE;
                 }
 
-                /* elevator state machine garbo */
+                // elevator state machine
                 switch (elevatorState)
                 {
-                    case ElevatorState.NOTHING:
-                        Debug.Print("the elevator aint doin shit");
-                        climbyTalon.Set(ControlMode.PercentOutput, 0.0); //sets the climber talon to 0%
+                    case ElevatorState.IDLE:
+                        Debug.Print("nothing");
+                        climbTalon.Set(ControlMode.PercentOutput, 0.0); //sets the climber talon to 0%
                         break;
                     case ElevatorState.RISE:
-                        Debug.Print("OH LOARD HE RISEN");
-                        climbyTalon.Set(ControlMode.PercentOutput, 0.5); //sets the climber talon to 50%
+                        Debug.Print("rising");
+                        climbTalon.Set(ControlMode.PercentOutput, 0.5); //sets the climber talon to 50%
                         break;
                     case ElevatorState.LOWER:
-                        Debug.Print("OH LOARD HE FALLEN");
-                        climbyTalon.Set(ControlMode.PercentOutput, -0.5); //sets the climber talon to -50%
+                        Debug.Print("lowering");
+                        climbTalon.Set(ControlMode.PercentOutput, -0.5); //sets the climber talon to -50%
                         break;
-                    case ElevatorState.FUCK:
-                        Debug.Print("what fuck");
+                    case ElevatorState.ERROR:
+                        Debug.Print("ElevatorState error");
                         break;
                     default:
-                        Debug.Print("WHAT FUCK??????///??");
+                        Debug.Print("very bad error");
                         break;
                 }
 
-                
-                
-                /* print the three analog inputs as three columns */
-                Debug.Print("Counter Value: " + counter);
+                // drive gain state machine 
+                switch (driveState)
+                {
+                    case DriveState.PRECISE:
+                        forwardGain = 0.3f;
+                        turnGain = 0.1f;
+                        Debug.Print("precise");
+                        break;
+                    case DriveState.STRONGER:
+                        forwardGain = 0.5f;
+                        turnGain = 0.25f;
+                        Debug.Print("stronger");
+                        break;
+                    default:
+                        Debug.Print("DriveState error");
+                        break;
+                }
+            }
+        }
 
-                /* increment counter */
-                ++counter; /* try to land a breakpoint here and hover over 'counter' to see it's current value.  Or add it to the Watch Tab */
-
-                /* Amount of time to wait before repeating the loop */
-                System.Threading.Thread.Sleep(10);
+        //prints the time in seconds 
+        static void PrintTime()
+        {
+            bool timer = true;
+            while (timer)
+            {
+                Thread.Sleep(1000);
+                float time = stopwatch.Duration;
+                Debug.Print("time: " + time );
+                if (time >= 200)
+                {
+                    timer = false;
+                }
             }
         }
     }
