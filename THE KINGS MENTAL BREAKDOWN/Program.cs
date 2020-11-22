@@ -45,6 +45,13 @@ namespace THE_KINGS_MENTAL_BREAKDOWN
         private static float forwardGain; // strength of forward
         private static float turnGain; //strength of turn
         private static float climbGain = 0.5f; //strength climber
+        private static bool running = true; //goes through while loop if running is true 
+
+        //buttons 
+        private static uint elevatorRise = 152342; //top yellow button
+        private static uint elevatorLower = 12324; //bottom green button
+        private static uint emergencyStop = 12563; // one of the middle buttons 
+        private static uint driveStateButton = 1723; //button on the joystick on the left
 
         public static void Main()
         {
@@ -81,7 +88,7 @@ namespace THE_KINGS_MENTAL_BREAKDOWN
                 rightDriveTalon.Set(ControlMode.PercentOutput, 0.0); //sets right drive talon to 0%
             }
 
-            while (true)
+            while (running)
             { 
                 // print axis value ???
                 Debug.Print("axis:" + gamepad1.GetAxis(1));
@@ -103,11 +110,11 @@ namespace THE_KINGS_MENTAL_BREAKDOWN
                 rightDriveTalon.Set(ControlMode.PercentOutput, finalRightTalonValue);
 
                  // Elevator controls 
-                if (gamepad1.GetButton(6808099))
+                if (gamepad1.GetButton(elevatorRise))
                 {
                     climbState = ClimbState.RISE;
                 }
-                else if (gamepad1.GetButton(9897))
+                else if (gamepad1.GetButton(elevatorLower))
                 {
                     climbState = ClimbState.LOWER;
                 }
@@ -117,11 +124,11 @@ namespace THE_KINGS_MENTAL_BREAKDOWN
                 }
 
                 // if the button is pressed the drivestate will switch 
-                if (gamepad1.GetButton(1423) && driveState == DriveState.PRECISE)// stick button
+                if (gamepad1.GetButton(driveStateButton) && driveState == DriveState.PRECISE)
                 {
                     driveState = DriveState.STRONGER;
                 }
-                else if (gamepad1.GetButton(1423) && driveState == DriveState.STRONGER)
+                else if (gamepad1.GetButton(driveStateButton) && driveState == DriveState.STRONGER)
                 {
                     driveState = DriveState.PRECISE;
                 }
@@ -165,6 +172,11 @@ namespace THE_KINGS_MENTAL_BREAKDOWN
                     default:
                         Debug.Print("DriveState error");
                         break;
+                }
+
+                if(gamepad1.GetButton(emergencyStop))
+                {
+                    running = false; 
                 }
             }
         }
