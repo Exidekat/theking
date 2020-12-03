@@ -14,7 +14,7 @@ namespace THE_KINGS_MENTAL_BREAKDOWN
         PRECISE, //slower, lower gain
         STRONGER //faster, higher gain 
     }
-    public enum ElevatorState
+    public enum ClimbState
     {
         IDLE,
         RISE,
@@ -26,7 +26,7 @@ namespace THE_KINGS_MENTAL_BREAKDOWN
     {
         private static Stopwatch stopwatch = new Stopwatch();
 
-        private static ElevatorState elevatorState = ElevatorState.ERROR; //creates a variable with a ElevatorState type, makes the starting value ERROR 
+        private static ClimbState climbState = ClimbState.ERROR; //creates a variable with a ElevatorState type, makes the starting value ERROR 
         private static DriveState driveState = DriveState.PRECISE;  //creates a variable with a DriveState type, makes the starting value PRECISE
 
         //creating a GameController object
@@ -44,6 +44,14 @@ namespace THE_KINGS_MENTAL_BREAKDOWN
 
         private static float forwardGain; // strength of forward
         private static float turnGain; //strength of turn
+        private static float climbGain = 0.5f; //strength climber
+        private static bool running = true; //goes through while loop if running is true 
+
+        //buttons 
+        private static uint elevatorRise = 152342; //top yellow button
+        private static uint elevatorLower = 12324; //bottom green button
+        private static uint emergencyStop = 12563; // one of the middle buttons 
+        private static uint driveStateButton = 1723; //button on the joystick on the left
 
         public static void Main()
         {
@@ -80,7 +88,7 @@ namespace THE_KINGS_MENTAL_BREAKDOWN
                 rightDriveTalon.Set(ControlMode.PercentOutput, 0.0); //sets right drive talon to 0%
             }
 
-            if (gamepad1.GetConnectionStatus() == CTRE.Phoenix.UsbDeviceConnection.Connected)
+            while (running)
             { 
                 // print axis value ???
                 Debug.Print("axis:" + gamepad1.GetAxis(1));
@@ -102,45 +110,45 @@ namespace THE_KINGS_MENTAL_BREAKDOWN
                 rightDriveTalon.Set(ControlMode.PercentOutput, finalRightTalonValue);
 
                  // Elevator controls 
-                if (gamepad1.GetButton(6808099))
+                if (gamepad1.GetButton(elevatorRise))
                 {
-                    elevatorState = ElevatorState.RISE;
+                    climbState = ClimbState.RISE;
                 }
-                else if (gamepad1.GetButton(9897))
+                else if (gamepad1.GetButton(elevatorLower))
                 {
-                    elevatorState = ElevatorState.LOWER;
+                    climbState = ClimbState.LOWER;
                 }
                 else
                 {
-                    elevatorState = ElevatorState.IDLE;
+                    climbState = ClimbState.IDLE;
                 }
 
                 // if the button is pressed the drivestate will switch 
-                if (gamepad1.GetButton(1423) && driveState == DriveState.PRECISE)// stick button
+                if (gamepad1.GetButton(driveStateButton) && driveState == DriveState.PRECISE)
                 {
                     driveState = DriveState.STRONGER;
                 }
-                else if (gamepad1.GetButton(1423) && driveState == DriveState.STRONGER)
+                else if (gamepad1.GetButton(driveStateButton) && driveState == DriveState.STRONGER)
                 {
                     driveState = DriveState.PRECISE;
                 }
 
                 // elevator state machine
-                switch (elevatorState)
+                switch (climbState)
                 {
-                    case ElevatorState.IDLE:
+                    case ClimbState.IDLE:
                         Debug.Print("nothing");
                         climbTalon.Set(ControlMode.PercentOutput, 0.0); //sets the climber talon to 0%
                         break;
-                    case ElevatorState.RISE:
+                    case ClimbState.RISE:
                         Debug.Print("rising");
-                        climbTalon.Set(ControlMode.PercentOutput, 0.5); //sets the climber talon to 50%
+                        climbTalon.Set(ControlMode.PercentOutput, 1 * climbGain); //sets the climber talon to 50%
                         break;
-                    case ElevatorState.LOWER:
+                    case ClimbState.LOWER:
                         Debug.Print("lowering");
-                        climbTalon.Set(ControlMode.PercentOutput, -0.5); //sets the climber talon to -50%
+                        climbTalon.Set(ControlMode.PercentOutput, -1 *  climbGain); //sets the climber talon to -50%
                         break;
-                    case ElevatorState.ERROR:
+                    case ClimbState.ERROR:
                         Debug.Print("ElevatorState error");
                         break;
                     default:
@@ -164,6 +172,11 @@ namespace THE_KINGS_MENTAL_BREAKDOWN
                     default:
                         Debug.Print("DriveState error");
                         break;
+                }
+
+                if(gamepad1.GetButton(emergencyStop))
+                {
+                    running = false; 
                 }
             }
         }
